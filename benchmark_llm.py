@@ -357,7 +357,10 @@ def get_single_phase_response(prompt, system_prompt, model_name):
     headers = {"Content-Type": "application/json"}
     if LLM_API_KEY and LLM_API_KEY != "None" and LLM_API_KEY != "":
         headers["Authorization"] = f"Bearer {LLM_API_KEY}"
-    
+
+    # Detect if using Ollama (default port 11434 or 'ollama' in URL)
+    is_ollama = ("11434" in LLM_SERVER_URL) or ("ollama" in LLM_SERVER_URL)
+
     data = {
         "model": model_name,
         "messages": [
@@ -366,30 +369,37 @@ def get_single_phase_response(prompt, system_prompt, model_name):
         ],
         "stream": False,
         "temperature": TEMPERATURE,
-        "top_k": TOP_K,
         "top_p": TOP_P,
-        "min_p": MIN_P,
     }
-    
-    # Add custom field if configured
-    if CUSTOM_FIELD_CONFIG and "field_name" in CUSTOM_FIELD_CONFIG and "field_value" in CUSTOM_FIELD_CONFIG:
-        data[CUSTOM_FIELD_CONFIG["field_name"]] = CUSTOM_FIELD_CONFIG["field_value"]
 
-    # Add structured output support
-    try:
-        data["response_format"] = {
-            "type": "json_schema",
-            "json_schema": {"name": "answer_choice", "schema": ANSWER_SCHEMA},
-        }
-    except:
-        pass
-    
+    # Only add OpenAI-specific fields if not using Ollama
+    if not is_ollama:
+        data["top_k"] = TOP_K
+        data["min_p"] = MIN_P
+        # Add custom field if configured
+        if CUSTOM_FIELD_CONFIG and "field_name" in CUSTOM_FIELD_CONFIG and "field_value" in CUSTOM_FIELD_CONFIG:
+            data[CUSTOM_FIELD_CONFIG["field_name"]] = CUSTOM_FIELD_CONFIG["field_value"]
+        # Add structured output support
+        try:
+            data["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "answer_choice", "schema": ANSWER_SCHEMA},
+            }
+        except:
+            pass
+
     try:
         response = requests.post(LLM_SERVER_URL, json=data, headers=headers, timeout=SINGLE_PHASE_TIMEOUT)
-        
         if response.status_code == 200:
             response_json = response.json()
-            result = response_json["choices"][0]["message"]["content"].strip()
+            # Ollama returns 'message' or 'choices' depending on endpoint
+            if "choices" in response_json:
+                result = response_json["choices"][0]["message"]["content"].strip()
+            elif "message" in response_json:
+                result = response_json["message"]["content"].strip()
+            else:
+                print("Error: Unexpected response format from server.")
+                return "ERROR"
             parsed_answer = parse_model_response(result)
             return parsed_answer
         else:

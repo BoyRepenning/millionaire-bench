@@ -1,10 +1,10 @@
 {
   "model": {
-    "name": "google/gemma-3-4b",
-    "server_url": "http://localhost:1234/v1/chat/completions",
+    "name": "gemma3:1b",
+    "server_url": "http://localhost:11434/v1/chat/completions",
     "api_key": "None",
-    "total_parameters": "4B",
-    "active_parameters": "4B"
+    "total_parameters": "20B",
+    "active_parameters": "20B"
   },
   "inference_parameters": {
     "temperature": 1,
